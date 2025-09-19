@@ -2,6 +2,7 @@ import argparse
 import sys
 import json
 import requests
+import re
 
 # --- Configuration ---
 # The default URL for the Ollama API.
@@ -16,6 +17,89 @@ Use common Python libraries like NumPy for matrix operations and Matplotlib for 
 Do not include any explanations, markdown formatting, or introductory text in your response.
 Only provide the raw Python code. Do not wrap the code in backticks or any other formatting.
 """
+
+def parse_python_code(response_text: str) -> str:
+    """
+    Extracts raw Python code from a formatted response that may contain
+    explanatory text, markdown formatting, backticks, etc.
+    
+    Args:
+        response_text: The raw response from the LLM that may contain formatting
+        
+    Returns:
+        Clean Python code with formatting and explanations removed
+    """
+    # First, try to extract code from markdown code blocks
+    code_block_pattern = r'```(?:python)?\s*\n(.*?)\n```'
+    code_blocks = re.findall(code_block_pattern, response_text, re.DOTALL | re.IGNORECASE)
+    
+    if code_blocks:
+        # If we found code blocks, use the first one (assuming it's the main code)
+        code = code_blocks[0].strip()
+    else:
+        # If no code blocks found, try to extract lines that look like Python code
+        lines = response_text.split('\n')
+        code_lines = []
+        in_code_section = False
+        
+        for line in lines:
+            stripped_line = line.strip()
+            
+            # Skip empty lines and obvious explanatory text
+            if not stripped_line:
+                continue
+            if stripped_line.startswith(('Here\'s', 'This function', 'You can call', 'The function')):
+                continue
+            if stripped_line.startswith(('```', '**', '#', 'Note:', 'Example:')):
+                continue
+                
+            # Check if line looks like Python code
+            if (stripped_line.startswith(('def ', 'class ', 'import ', 'from ')) or
+                re.match(r'^\s*(if|for|while|try|except|with|return|print|#)', stripped_line) or
+                '=' in stripped_line and not stripped_line.endswith(':') or
+                stripped_line.endswith((':')) or
+                re.match(r'^\s+', line)):  # Indented lines are likely code
+                code_lines.append(line)
+                in_code_section = True
+            elif in_code_section and not stripped_line:
+                # Add empty lines within code sections
+                code_lines.append('')
+        
+        code = '\n'.join(code_lines).strip()
+    
+    # Clean up common formatting issues
+    code = re.sub(r'^Here\'s.*?:\s*', '', code, flags=re.IGNORECASE)
+    code = re.sub(r'^```python\s*', '', code, flags=re.MULTILINE)
+    code = re.sub(r'^```\s*$', '', code, flags=re.MULTILINE)
+    
+    # Fix common syntax errors in the converted code
+    # Fix malformed for loops like "for i in range(1,n+1)):"
+    code = re.sub(r'range\([^)]+\)\)\s*:', lambda m: m.group(0).replace('))', ')'), code)
+    
+    # Remove duplicate return statements or malformed syntax
+    lines = code.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        # Fix lines with semicolon-separated statements that should be on separate lines
+        if '; ' in line and not line.strip().startswith('#'):
+            parts = line.split('; ')
+            base_indent = len(line) - len(line.lstrip())
+            for i, part in enumerate(parts):
+                if part.strip():
+                    if i == 0:
+                        cleaned_lines.append(part)
+                    else:
+                        cleaned_lines.append(' ' * base_indent + part)
+        else:
+            cleaned_lines.append(line)
+    
+    code = '\n'.join(cleaned_lines)
+    
+    # Remove any trailing explanatory text
+    code = re.sub(r'\n\s*This function.*$', '', code, flags=re.DOTALL)
+    code = re.sub(r'\n\s*You can call.*$', '', code, flags=re.DOTALL)
+    
+    return code.strip()
 
 def convert_matlab_to_python(matlab_code: str, ollama_url: str, model: str) -> str | None:
     """
@@ -55,10 +139,18 @@ def convert_matlab_to_python(matlab_code: str, ollama_url: str, model: str) -> s
         response_data = response.json()
         
         # Extract the converted code from the 'response' key
-        python_code = response_data.get("response", "").strip()
+        raw_response = response_data.get("response", "").strip()
+        
+        if not raw_response:
+            print("❌ Error: Received an empty response from the model.", file=sys.stderr)
+            return None
+
+        # Parse the response to extract clean Python code
+        python_code = parse_python_code(raw_response)
         
         if not python_code:
-            print("❌ Error: Received an empty response from the model.", file=sys.stderr)
+            print("❌ Error: Could not extract valid Python code from the response.", file=sys.stderr)
+            print(f"Raw response was: {raw_response[:200]}...", file=sys.stderr)
             return None
 
         return python_code
