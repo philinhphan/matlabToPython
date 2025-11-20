@@ -55,6 +55,16 @@ This will:
   - For OpenAI models: `--model openai:gpt-4o`
   - For Ollama models: `--model qwen:0.5b`
 - `--url`: Ollama API endpoint URL (default: `http://localhost:11434/v1`)
+- `--run-tests`: Run pytest against the generated Python files after conversion
+- `--tests-path`: Override the tests target passed to pytest (defaults to the output directory)
+- `--pytest-args`: Extra pytest CLI arguments (quoted string, e.g. `--pytest-args "-k smoke -vv"`)
+
+### Dynamic Testing
+
+- Install `pytest` (already listed in `requirements.txt`) and provide a test suite that targets the generated Python code.
+- Add `--run-tests` to automatically execute pytest after the converter writes its output. The tool runs within the output directory so imports resolve correctly.
+- Use `--tests-path` and `--pytest-args` to fine-tune which tests are executed and how.
+- When using tool-calling models (e.g., `--model openai:gpt-4o`), the agent can call the `run_tests` tool mid-conversion to validate intermediate outputs and retry on failures.
 
 ### Examples
 
@@ -93,4 +103,5 @@ python matlab_to_python_converter.py example_script.m example_function.m
 - Python 3.8+
 - pydantic-ai
 - python-dotenv
+- pytest
 - OpenAI API key (for OpenAI models) or Ollama running locally

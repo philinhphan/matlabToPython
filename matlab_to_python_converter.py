@@ -1,9 +1,10 @@
 import argparse
 import ast
 import os
+import shlex
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Type
+from typing import Any, Dict, List, Optional, Type
 from dotenv import load_dotenv
 
 from pydantic import BaseModel
@@ -11,6 +12,7 @@ from pydantic_ai import Agent, ModelRetry, PromptedOutput
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.ollama import OllamaProvider
 
+from testing_utils import run_pytest
 
 # Load environment variables from a .env file if it exists
 load_dotenv()
@@ -93,6 +95,66 @@ class PythonFiles(BaseModel):
     files: Dict[str, str]  # filename -> Python code
 
 
+def normalize_pytest_args(pytest_args: Optional[Any]) -> Optional[List[str]]:
+    """
+    Normalize various pytest argument representations into a list of strings.
+    """
+    if not pytest_args:
+        return None
+    if isinstance(pytest_args, list):
+        return pytest_args
+    if isinstance(pytest_args, tuple):
+        return list(pytest_args)
+    return shlex.split(str(pytest_args))
+
+
+def run_cli_tests(
+    should_run: bool,
+    tests_path: Optional[str],
+    code_root: Path,
+    pytest_args: Optional[str],
+) -> None:
+    """
+    Optionally execute pytest based on CLI arguments.
+    """
+    if not should_run:
+        return
+
+    args_list = normalize_pytest_args(pytest_args)
+    test_target = tests_path or "."
+
+    print("\n🧪 Running pytest on generated code...")
+    print(f"   Working directory: {code_root}")
+    print(f"   Tests target: {test_target}")
+    if args_list:
+        print(f"   Extra pytest args: {' '.join(args_list)}")
+
+    result = run_pytest(
+        tests_path=test_target,
+        code_path=str(code_root),
+        pytest_args=args_list,
+    )
+
+    print(f"   Command: {result['command']}")
+    print(f"   Status: {result['status']}")
+
+    if result["stdout"].strip():
+        print("\n--- pytest stdout ---")
+        print(result["stdout"])
+        print("--- end stdout ---")
+
+    if result["stderr"].strip():
+        print("\n--- pytest stderr ---")
+        print(result["stderr"])
+        print("--- end stderr ---")
+
+    if result["status"] != "passed":
+        print("❌ Tests failed. See logs above for details.", file=sys.stderr)
+        sys.exit(result["returncode"] or 1)
+    else:
+        print("✅ Tests passed successfully.")
+
+
 def create_agent(ollama_url: str, model_name: str, multi_file: bool = False) -> Agent:
     """
     Creates and configures the Pydantic AI agent for code conversion.
@@ -118,7 +180,9 @@ def create_agent(ollama_url: str, model_name: str, multi_file: bool = False) -> 
     effective_output_type: Any
     effective_system_prompt: str
 
-    if model_name.startswith("openai:"):
+    supports_tool_calling = model_name.startswith("openai:")
+
+    if supports_tool_calling:
         # Use OpenAI API with native tool calling
         print("   ... Using OpenAI API with tool calling.")
         # Strip the "openai:" prefix when passing the name to OpenAIChatModel
@@ -257,6 +321,25 @@ def create_agent(ollama_url: str, model_name: str, multi_file: bool = False) -> 
 
                 raise ModelRetry(error_feedback)
 
+    if supports_tool_calling:
+        @agent.tool
+        def run_tests(
+            tests_path: Optional[str] = None,
+            code_path: Optional[str] = None,
+            pytest_args: Optional[List[str]] = None,
+        ) -> Dict[str, Any]:
+            """
+            Execute pytest inside the agent workflow so the model can react to failures.
+            """
+            print("🧪 Agent requested to run pytest...")
+            pytest_result = run_pytest(
+                tests_path=tests_path,
+                code_path=code_path,
+                pytest_args=pytest_args,
+            )
+            print(f"   ...pytest finished with status: {pytest_result['status']}")
+            return pytest_result
+
     return agent
 
 
@@ -369,6 +452,19 @@ def main():
         help=f"The URL of the Ollama OpenAI-compatible API endpoint (default: {DEFAULT_OLLAMA_URL}). "
              "This is ignored if using a model with a provider prefix like 'openai:'.",
     )
+    parser.add_argument(
+        "--run-tests",
+        action="store_true",
+        help="Run pytest against the converted code after generation completes.",
+    )
+    parser.add_argument(
+        "--tests-path",
+        help="Path to the pytest tests to execute (defaults to '.' inside the output directory).",
+    )
+    parser.add_argument(
+        "--pytest-args",
+        help="Additional pytest CLI arguments (provide as a quoted string).",
+    )
 
     args = parser.parse_args()
 
@@ -464,6 +560,13 @@ def main():
             for cf in converted_files:
                 print(f"     - {cf}")
         print('='*60)
+
+        run_cli_tests(
+            should_run=args.run_tests,
+            tests_path=args.tests_path,
+            code_root=output_dir,
+            pytest_args=args.pytest_args,
+        )
         
     else:
         # SINGLE FILE CONVERSION
@@ -512,6 +615,13 @@ def main():
         except IOError as e:
             print(f"❌ Error writing to file '{output_file}': {e}", file=sys.stderr)
             sys.exit(1)
+
+        run_cli_tests(
+            should_run=args.run_tests,
+            tests_path=args.tests_path,
+            code_root=output_file.parent,
+            pytest_args=args.pytest_args,
+        )
 
 
 if __name__ == "__main__":
