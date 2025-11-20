@@ -1,6 +1,4 @@
 %% Complex MATLAB Script for Conversion Testing
-% Author: ChatGPT
-% Date: 2025-10-22
 % Description:
 % This script combines multiple MATLAB functionalities:
 % - Signal processing (filtering, FFT, wavelets)
