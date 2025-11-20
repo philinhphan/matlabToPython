@@ -88,21 +88,9 @@ python matlab_to_python_converter.py example_script.m example_function.m
 4. **Validate** all generated Python files
 5. **Write ALL** output files
 
-**Key Difference**: In batch mode, the agent receives the complete content of all files in one operation, enabling it to understand relationships and generate proper imports automatically.
-
-For detailed information about batch multi-file conversion, see [MULTIFILE_GUIDE.md](MULTIFILE_GUIDE.md).
-
 ## Requirements
 
 - Python 3.8+
 - pydantic-ai
 - python-dotenv
 - OpenAI API key (for OpenAI models) or Ollama running locally
-
-## Documentation
-
-- **[Quick Reference](QUICK_REFERENCE.md)** - Command cheat sheet and common patterns
-- **[Batch Conversion Summary](BATCH_CONVERSION_SUMMARY.md)** - How batch conversion works (START HERE)
-- **[Before/After Comparison](BEFORE_AFTER_COMPARISON.md)** - Visual comparison of old vs new approach
-- **[Multi-File Guide](MULTIFILE_GUIDE.md)** - Comprehensive guide for multi-file batch conversion
-- **[Example Workflow](EXAMPLE_WORKFLOW.md)** - Step-by-step walkthrough with examples
