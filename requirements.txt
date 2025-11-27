@@ -1,3 +1,4 @@
-pydantic-ai
+pydantic-ai[logfire]
 python-dotenv
 pytest
+logfire

@@ -8,9 +8,14 @@ from typing import Any, Dict, List, Optional, Type
 from dotenv import load_dotenv
 
 from pydantic import BaseModel
+import logfire
 from pydantic_ai import Agent, ModelRetry, PromptedOutput
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.ollama import OllamaProvider
+
+# Configure Logfire
+logfire.configure()
+logfire.instrument_pydantic_ai()
 
 from testing_utils import run_pytest
 
