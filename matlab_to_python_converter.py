@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from pydantic import BaseModel
 import logfire
-from pydantic_ai import Agent, ModelRetry, PromptedOutput
+from pydantic_ai import Agent, ModelRetry, PromptedOutput, RunContext
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.ollama import OllamaProvider
 
@@ -221,7 +221,7 @@ def create_agent(ollama_url: str, model_name: str, multi_file: bool = False) -> 
 
     if multi_file:
         @agent.output_validator
-        def validate_python_files(ctx: Any, output: PythonFiles) -> PythonFiles:
+        def validate_python_files(ctx: RunContext[Any], output: PythonFiles) -> PythonFiles:
             """
             Validates all generated Python files using ast.parse.
             If any file has invalid syntax, it raises ModelRetry.
@@ -268,7 +268,7 @@ def create_agent(ollama_url: str, model_name: str, multi_file: bool = False) -> 
             return output
     else:
         @agent.output_validator
-        def validate_python_syntax(ctx: Any, output: PythonCode) -> PythonCode:
+        def validate_python_syntax(ctx: RunContext[Any], output: PythonCode) -> PythonCode:
             """
             Validates the generated Python code using ast.parse.
             If syntax is invalid, it raises ModelRetry to ask the LLM to fix it.
@@ -329,6 +329,7 @@ def create_agent(ollama_url: str, model_name: str, multi_file: bool = False) -> 
     if supports_tool_calling:
         @agent.tool
         def run_tests(
+            ctx: RunContext[Any],
             tests_path: Optional[str] = None,
             code_path: Optional[str] = None,
             pytest_args: Optional[List[str]] = None,
