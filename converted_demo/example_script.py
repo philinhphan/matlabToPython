@@ -1,6 +1,7 @@
-import numpy as np
 import matplotlib.pyplot as plt
 from example_function import add_numbers
+
+# Example script that uses add_numbers function
 
 def main():
     x = 5
@@ -12,8 +13,8 @@ def main():
     print(f'The sum of {x} and {y} is {sum_result}')
 
     # Create a simple plot
-    data = np.arange(1, 11)
-    squared = data ** 2
+    data = range(1, 11)
+    squared = [i ** 2 for i in data]
 
     plt.figure()
     plt.plot(data, squared, 'b-', linewidth=2)
@@ -23,5 +24,5 @@ def main():
     plt.grid(True)
     plt.show()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

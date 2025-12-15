@@ -1,12 +1,12 @@
 def add_numbers(a, b):
     """
     ADD_NUMBERS Add two numbers together
-
+    
     Inputs:
-      a - first number
-      b - second number
+      a - First number
+      b - Second number
 
     Output:
-      result - sum of a and b
+      result - Sum of a and b
     """
     return a + b

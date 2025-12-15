@@ -26,7 +26,8 @@ def run_pytest(
             - stderr: Captured standard error from pytest.
             - status: "passed" when pytest exits 0, otherwise "failed".
     """
-    cmd = ["pytest"]
+    import sys
+    cmd = [sys.executable, "-m", "pytest"]
 
     if pytest_args:
         cmd.extend(pytest_args)
