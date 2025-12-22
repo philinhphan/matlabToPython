@@ -1,11 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+# Example function that adds two numbers
+
 def add_numbers(a, b):
-    """Add two numbers and return the result."""
     return a + b
 
-# Variables
 x = 5
 y = 10
 

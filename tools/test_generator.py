@@ -12,7 +12,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.ollama import OllamaProvider
 
 
-DEFAULT_MODEL = "openai:gpt-4o"
+DEFAULT_MODEL = "openai:gpt-4o-mini"
 DEFAULT_OLLAMA_URL = "http://localhost:11434/v1"
 
 

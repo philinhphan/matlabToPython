@@ -16,7 +16,7 @@ from pydantic_ai.providers.ollama import OllamaProvider
 
 # Default configuration
 DEFAULT_OLLAMA_URL = "http://localhost:11434/v1"
-DEFAULT_MODEL = "openai:gpt-4o"
+DEFAULT_MODEL = "openai:gpt-4o-mini"
 
 
 # System prompts

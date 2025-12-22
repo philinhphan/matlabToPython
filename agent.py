@@ -32,7 +32,7 @@ from tools.report_generator import generate_report, generate_report_tool
 
 
 # Configuration
-DEFAULT_MODEL = os.getenv("CONVERSION_MODEL", "openai:gpt-4o")
+DEFAULT_MODEL = os.getenv("CONVERSION_MODEL", "openai:gpt-4o-mini")
 DEFAULT_OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/v1")
 MAX_RETRIES = 5
 
