@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
-from pydantic_ai import Agent
+from pydantic_ai import Agent, PromptedOutput
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.ollama import OllamaProvider
 
@@ -19,8 +19,8 @@ DEFAULT_OLLAMA_URL = "http://localhost:11434/v1"
 DEFAULT_MODEL = "openai:gpt-4o-mini"
 
 
-# System prompts
-SYSTEM_PROMPT_SINGLE = """You are an expert programmer specializing in migrating Matlab code to Python.
+# System prompts for tool-calling models (gpt-4o, gpt-4)
+SYSTEM_PROMPT_SINGLE_TOOLS = """You are an expert programmer specializing in migrating Matlab code to Python.
 Your task is to convert the given Matlab code to clean, efficient, and idiomatic Python code.
 Use common Python libraries like NumPy for matrix operations and Matplotlib for plotting.
 
@@ -31,7 +31,7 @@ Return a dictionary with a "files" key containing the converted files where:
 Do NOT include test files - those will be generated separately.
 """
 
-SYSTEM_PROMPT_BATCH = """You are an expert programmer specializing in migrating Matlab code to Python.
+SYSTEM_PROMPT_BATCH_TOOLS = """You are an expert programmer specializing in migrating Matlab code to Python.
 Your task is to convert ALL the given Matlab files to clean, efficient, and idiomatic Python code.
 Use common Python libraries like NumPy for matrix operations and Matplotlib for plotting.
 
@@ -47,10 +47,66 @@ Return a dictionary with a "files" key containing all converted files where:
 Do NOT include test files - those will be generated separately.
 """
 
+# System prompts for JSON-prompted models (gpt-4o-mini, qwen, etc.)
+SYSTEM_PROMPT_SINGLE_JSON = """You are an expert programmer specializing in migrating Matlab code to Python.
+Your task is to convert the given Matlab code to clean, efficient, and idiomatic Python code.
+Use common Python libraries like NumPy for matrix operations and Matplotlib for plotting.
+
+You MUST return a JSON object with a "files" key containing a dictionary where:
+- Keys are the output Python filenames (e.g., "example_script.py")
+- Values are the complete Python code for each file
+
+Example format:
+{
+  "files": {
+    "example.py": "import numpy as np\\n\\ndef main():\\n    pass"
+  }
+}
+
+Do not include any other explanations, markdown formatting, or introductory text.
+Only provide the raw JSON object. Do NOT include test files.
+"""
+
+SYSTEM_PROMPT_BATCH_JSON = """You are an expert programmer specializing in migrating Matlab code to Python.
+Your task is to convert ALL the given Matlab files to clean, efficient, and idiomatic Python code.
+Use common Python libraries like NumPy for matrix operations and Matplotlib for plotting.
+
+You are converting multiple files from the same codebase in a SINGLE operation. Pay attention to:
+- Function calls between files (convert to proper Python imports)
+- Shared variables and data structures
+- Maintaining consistent naming conventions across files
+
+You MUST return a JSON object with a "files" key containing a dictionary where:
+- Keys are the output Python filenames (e.g., "example_script.py")
+- Values are the complete Python code for each file
+
+Example format:
+{
+  "files": {
+    "file1.py": "import numpy as np\\n\\ndef func1():\\n    pass",
+    "file2.py": "from file1 import func1\\n\\ndef main():\\n    func1()"
+  }
+}
+
+Do not include any other explanations, markdown formatting, or introductory text.
+Only provide the raw JSON object. Do NOT include test files.
+"""
+
+# Models that support native tool calling well
+TOOL_CALLING_MODELS = ["gpt-4o", "gpt-4", "gpt-4-turbo"]
+
 
 class PythonFiles(BaseModel):
     """Output model for converted Python files."""
     files: Dict[str, str]
+
+
+def supports_tool_calling(model_name: str) -> bool:
+    """Check if model supports native tool calling."""
+    if model_name.startswith("openai:"):
+        model_suffix = model_name.split(":", 1)[-1]
+        return any(m in model_suffix for m in TOOL_CALLING_MODELS)
+    return False
 
 
 def create_conversion_agent(
@@ -69,6 +125,7 @@ def create_conversion_agent(
     Returns:
         Configured Pydantic AI Agent
     """
+    # Determine model and provider
     if model_name.startswith("openai:"):
         model_name_clean = model_name.split(":", 1)[-1]
         model = OpenAIChatModel(model_name=model_name_clean)
@@ -76,13 +133,21 @@ def create_conversion_agent(
         ollama_provider = OllamaProvider(base_url=ollama_url)
         model = OpenAIChatModel(model_name=model_name, provider=ollama_provider)
     
-    system_prompt = SYSTEM_PROMPT_BATCH if is_batch else SYSTEM_PROMPT_SINGLE
+    # Use tool calling for supported models, JSON prompting for others
+    use_tools = supports_tool_calling(model_name)
+    
+    if use_tools:
+        output_type = PythonFiles
+        system_prompt = SYSTEM_PROMPT_BATCH_TOOLS if is_batch else SYSTEM_PROMPT_SINGLE_TOOLS
+    else:
+        output_type = PromptedOutput(PythonFiles)
+        system_prompt = SYSTEM_PROMPT_BATCH_JSON if is_batch else SYSTEM_PROMPT_SINGLE_JSON
     
     return Agent(
         model=model,
-        output_type=PythonFiles,
+        output_type=output_type,
         instructions=system_prompt,
-        retries=3,
+        retries=5,
     )
 
 

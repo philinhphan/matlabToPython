@@ -12,7 +12,7 @@ from typing import Dict, List, Optional
 
 
 @dataclass
-class SyntaxError:
+class CodeSyntaxError:
     """Details of a syntax error."""
     filename: str
     line: int
@@ -25,7 +25,7 @@ class SyntaxError:
 class ValidationResult:
     """Result of static validation."""
     is_valid: bool
-    errors: List[SyntaxError] = field(default_factory=list)
+    errors: List[CodeSyntaxError] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
 
@@ -64,7 +64,7 @@ def validate_single_file(filename: str, code: str) -> ValidationResult:
     if not cleaned_code:
         return ValidationResult(
             is_valid=False,
-            errors=[SyntaxError(
+            errors=[CodeSyntaxError(
                 filename=filename,
                 line=0,
                 column=0,
@@ -84,7 +84,7 @@ def validate_single_file(filename: str, code: str) -> ValidationResult:
         
         return ValidationResult(
             is_valid=False,
-            errors=[SyntaxError(
+            errors=[CodeSyntaxError(
                 filename=filename,
                 line=e.lineno or 0,
                 column=e.offset or 0,
